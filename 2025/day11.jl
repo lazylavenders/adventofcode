@@ -614,107 +614,73 @@ mnu: dtu lex
 utz: wqy plv omh
 xet: doo smd"
 
-function process(input::String)::Vector{Vector{String}}
-	res = []
+function process(input::String)
+	res = Dict{String, Vector{String}}()
 	for i in split(input, '\n')
-		start, rest = split(i, ": ")
+		start::String, rest = split(i, ": ")
 		rest = string.(split(rest, ' '))
-		push!(res, [start, rest...])
+		res[start] = rest
 	end
 	return res
 end
 
+###############################################
+####### PART ONE BEGINS HERE #################
+#############################################
+
+using Memoize
 const pathmap = process(rawinput)
-"[source, outputs...][]"
+CACHE_to_out = Dict{String, BigInt}("out"=>1)
 
-function getouts(path::Vector, name::String)
-	res = filter(x -> x[1] == name, path)
-	@assert length(res) > 0 "why is there no $name in the input"
-	res[begin][2:end]
-end
-
-function getins(path::Vector, name::String)
-	return filter(path) do x
-		name in getouts(x)
-	end
-end
-
-function getdead(path::Vector)
-	res = []
-	for i in path
-		if length(i[2:end] )  == 1
-			push!(res, i[1])
-		end
-	end
-	return res
-end
-
-function replacedeadsinouts(path::Vector)::Vector{Vector{String}}
-	res::Vector{Vector{String}} = []
-	deads = getdead(path)
-
-	for row in path
-		#@show row, !any((i in row[2:end] for i in deads))
-		if !any((i in row[2:end] for i in deads))
-			push!(res, row)
-		else
-			root, rest... = row
-			while any((dead in rest for dead in deads))
-				badones = filter(x-> x in deads, rest)
-				#display(badones)
-				for bad in badones
-					replace!(rest, bad=>getouts(path, bad)...)
-				end
-			end
-			push!(res, [root, rest...])
-		end
-	end
-	return res
-end
-
-function replacedeads(path::Vector)::Vector{Vector{String}} 
-	path = filter(x->!(x[begin] in getdead(path)), replacedeadsinouts(path))
-end
-
-
-function numpaths(path::Vector, frm::String, to::String)::Int
-	return [numpaths(path, i, to) for i in getouts(path, frm)] |> sum
-end
-
-#display(pathmap)
-@time const refinedpathmap = replacedeads(pathmap)
-
-
-function paths(path::Vector, frm::String, to::String)
-	init::Vector{String} = getouts(path, frm)
-	while unique(init) != [to]
-		init2 = []
-		for i in init
-			if i!= to push!(init2, getouts(path, i)...)
-			else push!(init2, to) end
-		end
-		init = init2
+function findpath(init::String)
+	if haskey(CACHE_to_out, init)
+		return CACHE_to_out[init]
 	end
 
-	return init
-end
-
-println("The answer to part 1 is ", paths(refinedpathmap, "you", "out") |> length)
-
-
-function paths2(path::Vector, frm::String, to::String)
-	init::Vector{String} = getouts(path, frm)
-	while unique(init) != [to]
-		init2 = []
-		for i in init
-			if i!= to push!(init2, getouts(path, i)...)
-			else push!(init2, to) end
-		end
-		init = init2
+	counter = 0
+	for i in pathmap[init]
+		counter += findpath(i)
 	end
 
-	return init
+	CACHE_to_out[init] = counter
+
+	return counter
 end
 
+println("The answer to part one is ", findpath("you"))
 
-#display(@time paths(refinedpathmap, "svr", "dac") |> length)
+CACHE_to_fft = Dict{String, BigInt}("fft"=>1, "out"=>0)
+CACHE_to_dac = Dict{String, BigInt}("dac"=>1, "out"=>0)
+
+function findpathfft(init::String)::BigInt
+	if haskey(CACHE_to_fft, init)
+		return CACHE_to_fft[init]
+	end
+
+	counter::BigInt = 0
+	for i in pathmap[init]
+		counter += findpathfft(i)
+	end
+
+	CACHE_to_fft[init] = counter
+
+	return counter
+end
+
+function findpathdac(init::String)::BigInt
+	if haskey(CACHE_to_dac, init)
+		return CACHE_to_dac[init]
+	end
+
+	counter::BigInt = 0
+	for i in pathmap[init]
+		counter += findpathdac(i)
+	end
+
+	CACHE_to_dac[init] = counter
+
+	return counter
+end
+
+println("The answer to part 2 is ", 
+	findpathfft("svr") * findpathdac("fft") * findpath("dac"))
